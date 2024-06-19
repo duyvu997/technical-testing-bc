@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Graph Visualization</title>
+  <style>
+    .node {
+      stroke: #fff;
+      stroke-width: 1.5px;
+    }
+
+    .virus {
+      fill: red;
+      stroke: #fff;
+      stroke-width: 2px;
+    }
+
+    .link {
+      stroke: #999;
+      stroke-opacity: 0.6;
+    }
+
+    text {
+      font: 14px sans-serif; /* Larger font size */
+      pointer-events: none;
+      fill: black; /* Black text color */
+    }
+
+    #inputContainer {
+      margin-bottom: 20px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 100px;
+    }
+
+    button {
+      margin-top: 10px;
+      margin-right: 10px;
+    }
+  </style>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+</head>
+<body>
+  <h1>Graph Visualization</h1>
+  <div id="inputContainer">
+    <textarea
+      id="graphInput"
+      placeholder="Paste your graph input here..."
+    ></textarea>
+    <button onclick="renderGraph()">Render Graph</button>
+    <button onclick="changeNodeSize()">Change Node Size</button>
+  </div>
+  <svg></svg>
+
+  <script>
+    let nodeSize = 20;
+
+    function renderGraph() {
+      const input = document
+        .getElementById('graphInput')
+        .value.trim()
+        .split('\n');
+      const numNodes = parseInt(input[0]);
+      const virusLocation = parseInt(input[1]);
+      const numLinks = parseInt(input[2]);
+      const links = input.slice(3).map((line) => {
+        const [source, target] = line.split(' ').map(Number);
+        return { source, target };
+      });
+
+      d3.select('svg').selectAll('*').remove();
+
+      const nodes = Array.from({ length: numNodes }, (_, i) => ({
+        id: i,
+        infected: i === virusLocation,
+      }));
+
+      const svg = d3
+        .select('svg')
+        .attr('width', 0.9 * window.innerWidth)
+        .attr('height', 0.7 * window.innerHeight)
+        .call(
+          d3.zoom().on('zoom', ({ transform }) => {
+            svg.attr('transform', transform);
+          })
+        )
+        .append('g');
+
+      window.addEventListener('resize', () => {
+        d3.select('svg')
+          .attr('width', window.innerWidth)
+          .attr('height', window.innerHeight);
+      });
+
+      const simulation = d3
+        .forceSimulation(nodes)
+        .force(
+          'link',
+          d3
+            .forceLink(links)
+            .id((d) => d.id)
+            .distance(100)
+        )
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force(
+          'center',
+          d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2)
+        );
+
+      const link = svg
+        .append('g')
+        .attr('class', 'links')
+        .selectAll('line')
+        .data(links)
+        .enter()
+        .append('line')
+        .attr('class', 'link');
+
+      const node = svg
+        .append('g')
+        .attr('class', 'nodes')
+        .selectAll('circle')
+        .data(nodes)
+        .enter()
+        .append('circle')
+        .attr('class', (d) => (d.infected ? 'node virus' : 'node'))
+        .attr('r', (d) => (d.infected ? 30 : nodeSize)) // Virus node is bigger
+        .attr('fill', 'gray') // Gray color for all nodes
+        .attr('id', (d) => `node-${d.id}`) // Assign id attribute for each node
+        .call(drag(simulation));
+
+      const labels = svg
+        .append('g')
+        .attr('class', 'labels')
+        .selectAll('text')
+        .data(nodes)
+        .enter()
+        .append('text')
+        .attr('dy', 4)
+        .attr('dx', -6)
+        .text((d) => d.id)
+        .attr('fill', '#000')
+        .attr('font-size', '14px') // Larger font size
+        .attr('text-anchor', 'middle')
+        .attr('alignment-baseline', 'central');
+
+      simulation.on('tick', () => {
+        link
+          .attr('x1', (d) => d.source.x)
+          .attr('y1', (d) => d.source.y)
+          .attr('x2', (d) => d.target.x)
+          .attr('y2', (d) => d.target.y);
+
+        node.attr('cx', (d) => d.x).attr('cy', (d) => d.y);
+
+        labels.attr('x', (d) => d.x).attr('y', (d) => d.y);
+      });
+
+      function drag(simulation) {
+        function dragStarted(event, d) {
+          if (!event.active) simulation.alphaTarget(0.3).restart();
+          d.fx = d.x;
+          d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+          d.fx = event.x;
+          d.fy = event.y;
+        }
+
+        function dragEnded(event, d) {
+          if (!event.active) simulation.alphaTarget(0);
+          d.fx = null;
+          d.fy = null;
+        }
+
+        return d3
+          .drag()
+          .on('start', dragStarted)
+          .on('drag', dragged)
+          .on('end', dragEnded);
+      }
+    }
+
+    function changeNodeSize() {
+      nodeSize =
+        parseInt(prompt('Enter new size for normal nodes:', nodeSize)) ||
+        nodeSize;
+      d3.selectAll('.node').attr('r', (d) => (d.infected ? 30 : nodeSize));
+    }
+  </script>
+</body>
+</html>
